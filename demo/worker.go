@@ -34,7 +34,7 @@ func logf(s string, p ...interface{}) {
 func do() error {
 	for {
 		// Establish a connection, retry indefinately.
-		conn := broker.WorkerConnection(brokerAddress)
+		conn := connor.TinyHandshakeDial(brokerAddress)
 		logf("Connected [%s]", brokerAddress)
 
 		scanner := bufio.NewScanner(conn)

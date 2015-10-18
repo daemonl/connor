@@ -3,10 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
+
+	"github.com/daemonl/connor"
 )
 
 var brokerClientAddress string
@@ -27,63 +28,25 @@ func main() {
 	fmt.Println("Clean Exit")
 }
 
-func logf(s string, p ...interface{}) {
-	log.Printf(s+"\n", p...)
-}
-
 var chanWorker = make(chan net.Conn)
-
-func addWorker(w net.Conn) {
-	chanWorker <- w
-}
+var chanClient = make(chan net.Conn)
 
 func do() error {
-	workerListener, err := net.Listen("tcp", brokerWorkerAddress)
-	if err != nil {
-		return err
-	}
-	clientListener, err := net.Listen("tcp", brokerClientAddress)
-	if err != nil {
-		return err
-	}
+	connor.Logger = connor.FuncLogger(func(m string) {
+		log.Println(m)
+	})
 
 	// Queue Workers
-	go func() {
-		for {
-			workerConn, err := workerListener.Accept()
-			if err != nil {
-				logf("Accepting worker connection: %s", err.Error())
-				continue
-			}
-			logf("Got Worker [%s]", workerConn.RemoteAddr())
-			go addWorker(workerConn)
-		}
-	}()
+	go connor.TinyHandshakeListen(brokerWorkerAddress, chanWorker)
+	go connor.TinyHandshakeListen(brokerClientAddress, chanClient)
 
 	// Loop Clients
 	for {
-		clientConn, err := clientListener.Accept()
-		if err != nil {
-			return err
-		}
-		logf("Got Client [%s]", clientConn.RemoteAddr())
-		match(clientConn)
+		clientConn := <-chanClient
+		log.Printf("Got Client [%s]\n", clientConn.RemoteAddr())
+		workerConn := <-chanWorker // Only accept a client request once it has a worker
+		log.Printf("Match C[%s] to W[%s]\n", clientConn.RemoteAddr(), workerConn.RemoteAddr())
+		connor.BindConnections(clientConn, workerConn)
 	}
 
-}
-
-func match(clientConn net.Conn) {
-	workerConn := <-chanWorker // Only accept a client request once it has a worker
-	logf("Match C[%s] to W[%s]", clientConn.RemoteAddr(), workerConn.RemoteAddr())
-	clientConn.Write([]byte{0x00})
-	go linkConnections(clientConn, workerConn)
-	go linkConnections(workerConn, clientConn)
-}
-
-func linkConnections(connA net.Conn, connB net.Conn) {
-	io.Copy(connA, connB)
-	// The error or number of bytes isn't really important
-	// Close both if either fail / close.
-	connA.Close()
-	connB.Close()
 }

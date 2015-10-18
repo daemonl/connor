@@ -27,7 +27,7 @@ func logf(s string, p ...interface{}) {
 
 func do(name string) {
 	for {
-		conn := broker.ClientConnection(brokerAddress)
+		conn := connor.TinyHandshakeDial(brokerAddress)
 		// Establish a connection, retry indefinately.
 		logf("Connected %s [%s]", name, brokerAddress)
 
