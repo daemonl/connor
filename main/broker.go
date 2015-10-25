@@ -19,6 +19,7 @@ func init() {
 }
 
 func main() {
+	flag.Parse()
 	err := do()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
